@@ -40,7 +40,10 @@ typedef struct mrb_heap_page {
   struct mrb_heap_page *free_next;
   struct mrb_heap_page *free_prev;
   mrb_bool old:1;
+#pragma warning(push)
+#pragma warning(disable:4200)
   void *objects[];
+#pragma warning(pop)
 } mrb_heap_page;
 
 typedef struct mrb_gc {
