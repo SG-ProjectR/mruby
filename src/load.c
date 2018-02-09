@@ -130,9 +130,11 @@ read_irep_record_1(mrb_state *mrb, const uint8_t *bin, size_t *len, uint8_t flag
         irep->pool[i] = mrb_str_to_inum(mrb, s, 10, FALSE);
         break;
 
+#ifndef MRB_WITHOUT_FLOAT
       case IREP_TT_FLOAT:
         irep->pool[i] = mrb_float_pool(mrb, mrb_str_to_dbl(mrb, s, FALSE));
         break;
+#endif
 
       case IREP_TT_STRING:
         irep->pool[i] = mrb_str_pool(mrb, s);
@@ -623,10 +625,11 @@ irep_error(mrb_state *mrb)
   mrb_exc_set(mrb, mrb_exc_new_str_lit(mrb, E_SCRIPT_ERROR, "irep load error"));
 }
 
-MRB_API mrb_value
-mrb_load_irep_cxt(mrb_state *mrb, const uint8_t *bin, mrbc_context *c)
+void mrb_codedump_all(mrb_state*, struct RProc*);
+
+static mrb_value
+load_irep(mrb_state *mrb, mrb_irep *irep, mrbc_context *c)
 {
-  mrb_irep *irep = mrb_read_irep(mrb, bin);
   struct RProc *proc;
 
   if (!irep) {
@@ -634,9 +637,17 @@ mrb_load_irep_cxt(mrb_state *mrb, const uint8_t *bin, mrbc_context *c)
     return mrb_nil_value();
   }
   proc = mrb_proc_new(mrb, irep);
+  proc->c = NULL;
   mrb_irep_decref(mrb, irep);
+  if (c && c->dump_result) mrb_codedump_all(mrb, proc);
   if (c && c->no_exec) return mrb_obj_value(proc);
   return mrb_top_run(mrb, proc, mrb_top_self(mrb), 0);
+}
+
+MRB_API mrb_value
+mrb_load_irep_cxt(mrb_state *mrb, const uint8_t *bin, mrbc_context *c)
+{
+  return load_irep(mrb, mrb_read_irep(mrb, bin), c);
 }
 
 MRB_API mrb_value
@@ -681,25 +692,10 @@ irep_exit:
   return irep;
 }
 
-void mrb_codedump_all(mrb_state*, struct RProc*);
-
 MRB_API mrb_value
 mrb_load_irep_file_cxt(mrb_state *mrb, FILE* fp, mrbc_context *c)
 {
-  mrb_irep *irep = mrb_read_irep_file(mrb, fp);
-  mrb_value val;
-  struct RProc *proc;
-
-  if (!irep) {
-    irep_error(mrb);
-    return mrb_nil_value();
-  }
-  proc = mrb_proc_new(mrb, irep);
-  mrb_irep_decref(mrb, irep);
-  if (c && c->dump_result) mrb_codedump_all(mrb, proc);
-  if (c && c->no_exec) return mrb_obj_value(proc);
-  val = mrb_top_run(mrb, proc, mrb_top_self(mrb), 0);
-  return val;
+  return load_irep(mrb, mrb_read_irep_file(mrb, fp), c);
 }
 
 MRB_API mrb_value
